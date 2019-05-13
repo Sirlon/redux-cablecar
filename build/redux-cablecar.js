@@ -73,15 +73,15 @@ module.exports =
 
 	var _cableCar2 = _interopRequireDefault(_cableCar);
 
-	var _cableCarDispatcher = __webpack_require__(3);
-
-	var _cableCarDispatcher2 = _interopRequireDefault(_cableCarDispatcher);
-
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	//import CableCarDispatcher from './cableCarDispatcher';
 
 	var cableProvider = void 0;
 
-	var dispatcher = new _cableCarDispatcher2.default();
+	var car = void 0;
+
+	//const dispatcher = new CableCarDispatcher();
 
 	var middleware = function middleware(store) {
 	  return function (next) {
@@ -97,22 +97,30 @@ module.exports =
 	          return next(action);
 
 	        case 'CABLECAR_DESTROY':
-	          dispatcher.destroyCar(action.CableCarChannel);
+	          if (car) {
+	            car.unsubscribe(action.CableCarChannel);
+	          }
+
 	          return store.getState();
 
 	        case 'CABLECAR_DESTROY_ALL':
-	          dispatcher.reset();
+	          if (car) {
+	            car.unsubscribeAll();
+	          }
+
 	          return store.getState();
 
 	        case 'CABLECAR_CHANGE_CHANNEL':
-	          dispatcher.changeCar(action.previousChannel, action.newChannel, action.options);
+	          if (car) {
+	            car.changeChannel(action.newChannel, action.params);
+	          }
+
 	          return store.getState();
 
 	        default:
-	          car = action.channel ? dispatcher.getCar(action.channel) : dispatcher.getDefaultCar();
 	          if (car && car.allows(action) && !action.CableCar__Action) {
 	            if (car.running) {
-	              car.send(action);
+	              car.send(action.channel, action);
 	            } else {
 	              console.error('CableCar: Dropped action!', 'Attempting to dispatch an action but cable car is not running.', action, 'optimisticOnFail: ' + car.options.optimisticOnFail);
 	              return car.options.optimisticOnFail ? next(action) : store.getState();
@@ -126,26 +134,25 @@ module.exports =
 	  };
 	};
 
-	middleware.connect = function (store, channel, options) {
+	middleware.connect = function (store, options) {
 	  if (!cableProvider) {
 	    try {
-	      cableProvider = __webpack_require__(4);
+	      cableProvider = __webpack_require__(3);
 	    } catch (e) {
 	      throw new Error('CableCar: No actionCableProvider set and \'actioncable\' Node package failed to load: ' + e);
 	    }
 	  }
 
-	  var car = new _cableCar2.default(cableProvider, store, channel, options);
-	  dispatcher.addCar(channel, car);
+	  car = new _cableCar2.default(cableProvider, store, options);
 
 	  // public car object returned
 	  return {
 	    changeChannel: car.changeChannel.bind(car),
-	    getChannel: car.getChannel.bind(car),
-	    getParams: car.getParams.bind(car),
+	    getChannels: car.getChannels.bind(car),
 	    perform: car.perform.bind(car),
 	    send: car.send.bind(car),
-	    unsubscribe: car.unsubscribe.bind(car)
+	    unsubscribe: car.unsubscribe.bind(car),
+	    subscribe: car.subscribe.bind(car)
 	  };
 	};
 
@@ -167,44 +174,46 @@ module.exports =
 
 	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
+	var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 	var CableCar = function () {
-	  function CableCar(cableProvider, store, channel) {
+	  function CableCar(cableProvider, store) {
 	    var _this = this;
 
-	    var options = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : {};
+	    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
 
 	    _classCallCheck(this, CableCar);
 
-	    this.initialized = function () {
-	      return _this.dispatch({ type: 'CABLECAR_INITIALIZED' });
+	    this.initialized = function (channel) {
+	      return _this.dispatch({ type: 'CABLECAR_INITIALIZED', channel: channel });
 	    };
 
-	    this.connected = function () {
-	      _this.dispatch({ type: 'CABLECAR_CONNECTED' });
+	    this.connected = function (channel) {
+	      _this.dispatch({ type: 'CABLECAR_CONNECTED', channel: channel });
 	      _this.running = true;
 	      if (_this.options.connected) {
-	        _this.options.connected.call();
+	        _this.options.connected.call(channel);
 	      }
 	    };
 
-	    this.disconnected = function () {
-	      _this.dispatch({ type: 'CABLECAR_DISCONNECTED' });
+	    this.disconnected = function (channel) {
+	      _this.dispatch({ type: 'CABLECAR_DISCONNECTED', channel: channel });
 	      _this.running = false;
 	      if (_this.options.disconnected) {
-	        _this.options.disconnected.call();
+	        _this.options.disconnected.call(channel);
 	      }
 	    };
 
-	    this.received = function (msg) {
-	      _this.dispatch(msg);
+	    this.received = function (msg, channel) {
+	      _this.dispatch(_extends({}, msg, { channel: channel }));
 	    };
 
-	    this.rejected = function () {
-	      throw new Error('CableCar: Attempt to connect was rejected.\n      (Channel: ' + _this.channel + ')');
+	    this.rejected = function (channel) {
+	      throw new Error('CableCar: Attempt to connect was rejected.\n      (Channel: ' + channel + ')');
 	    };
 
 	    if (typeof cableProvider === 'undefined') {
@@ -215,47 +224,58 @@ module.exports =
 	      throw new Error('CableCar: unknown store: ' + store);
 	    }
 
-	    if (typeof channel !== 'string') {
-	      throw new Error('CableCar: unknown channel: ' + channel);
-	    }
-
 	    this.actionCableProvider = cableProvider;
 	    this.store = store;
 
 	    var defaultOptions = { prefix: 'RAILS', optimisticOnFail: false };
-	    this.initialize(channel, Object.assign(defaultOptions, options));
+	    this.initialize(Object.assign(defaultOptions, options));
 	  }
 
 	  _createClass(CableCar, [{
 	    key: 'initialize',
-	    value: function initialize(channel, options) {
+	    value: function initialize(options) {
 
-	      this.channel = channel;
 	      this.options = options;
 	      this.running = false;
+	      this.subscriptions = {};
 
-	      var cableParams = options.params || {};
-	      cableParams = Object.assign({ channel: channel }, cableParams);
-
-	      this.subscription = this.actionCableProvider.createConsumer(options.wsURL).subscriptions.create(cableParams, {
-	        initialized: this.initialized,
-	        connected: this.connected,
-	        disconnected: this.disconnected,
-	        received: this.received,
-	        rejected: this.rejected
-	      });
+	      this.consumer = this.actionCableProvider.createConsumer(options.wsURL);
 	    }
 
 	    // ActionCable callback functions
 
 	  }, {
-	    key: 'dispatch',
+	    key: 'subscribe',
+	    value: function subscribe(channel) {
+	      var _this2 = this;
 
+	      var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+	      this.subscriptions[channel] = this.consumer.subscriptions.create(Object.assign({ channel: channel }, params), {
+	        initialized: function initialized() {
+	          return _this2.initialized(channel);
+	        },
+	        connected: function connected() {
+	          return _this2.connected(channel);
+	        },
+	        disconnected: function disconnected() {
+	          return _this2.disconnected(channel);
+	        },
+	        received: function received(msg) {
+	          return _this2.received(msg, channel);
+	        },
+	        rejected: function rejected() {
+	          return _this2.rejected(channel);
+	        }
+	      });
+	    }
 
 	    // Redux dispatch function
+
+	  }, {
+	    key: 'dispatch',
 	    value: function dispatch(action) {
 	      var newAction = Object.assign(action, {
-	        channel: this.channel,
 	        CableCar__Action: true
 	      });
 	      this.store.dispatch(newAction);
@@ -281,36 +301,54 @@ module.exports =
 	  }, {
 	    key: 'changeChannel',
 	    value: function changeChannel(channel) {
-	      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+	      var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
-	      this.unsubscribe();
-	      this.initialize(channel, Object.assign(this.options, options));
+	      if (this.subscriptions[channel]) {
+	        this.unsubscribe(channel);
+	        this.subscribe(channel, params);
+	      } else {
+	        throw new Error('CableCar: Unknown Channel ' + channel + ' to change Channel');
+	      }
 	    }
 	  }, {
-	    key: 'getChannel',
-	    value: function getChannel() {
-	      return this.channel;
-	    }
-	  }, {
-	    key: 'getParams',
-	    value: function getParams() {
-	      return this.options.params;
+	    key: 'getChannels',
+	    value: function getChannels() {
+	      return Object.keys(this.subscriptions);
 	    }
 	  }, {
 	    key: 'perform',
-	    value: function perform(method, payload) {
-	      this.subscription.perform(method, payload);
+	    value: function perform(channel, method, payload) {
+	      if (this.subscriptions[channel]) {
+	        this.subscriptions[channel].perform(method, payload);
+	      } else {
+	        throw new Error('CableCar: Unknown Channel ' + channel + ' to call perform ' + method);
+	      }
 	    }
 	  }, {
 	    key: 'send',
-	    value: function send(action) {
-	      this.subscription.send(action);
+	    value: function send(channel, action) {
+	      if (this.subscriptions[channel]) {
+	        this.subscriptions[channel].send(action);
+	      } else {
+	        throw new Error('CableCar: Unknown Channel ' + channel + ' to send ' + action.type);
+	      }
 	    }
 	  }, {
 	    key: 'unsubscribe',
-	    value: function unsubscribe() {
-	      this.subscription.unsubscribe();
-	      this.disconnected();
+	    value: function unsubscribe(channel) {
+	      if (this.subscriptions[channel]) {
+	        this.subscriptions[channel].unsubscribe();
+	        this.disconnected(channel);
+	      }
+	    }
+	  }, {
+	    key: 'unsubscribeAll',
+	    value: function unsubscribeAll() {
+	      var _this3 = this;
+
+	      Object.keys(this.subscriptions).forEach(function (channel) {
+	        _this3.unsubscribe(channel);
+	      });
 	    }
 	  }]);
 
@@ -321,124 +359,6 @@ module.exports =
 
 /***/ }),
 /* 3 */
-/***/ (function(module, exports) {
-
-	'use strict';
-
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-	var CableCarDispatcher = function () {
-	  function CableCarDispatcher(provider) {
-	    _classCallCheck(this, CableCarDispatcher);
-
-	    var lines = {};
-
-	    this.addLine = function (line, car) {
-	      lines[line] = car;
-	    };
-	    this.clearAllLines = function () {
-	      lines = {};
-	    };
-	    this.clearLine = function (line) {
-	      lines[line] = undefined;
-	    };
-	    this.getLines = function () {
-	      return lines;
-	    };
-	  }
-
-	  _createClass(CableCarDispatcher, [{
-	    key: 'addCar',
-	    value: function addCar(line, car) {
-	      if (this.getCar(line)) {
-	        throw new ReferenceError('CableCar Dispatcher: cannot connect two cars to same line/channel: ' + line);
-	      }
-	      this.addLine(line, car);
-	      return car;
-	    }
-	  }, {
-	    key: 'changeCar',
-	    value: function changeCar(oldLine, newLine, options) {
-	      var car = this.getCar(oldLine);
-
-	      if (!car) {
-	        console.error(new ReferenceError('CableCar Dispatcher (change failed): no car found on line/channel: ' + oldLine));
-	        return false;
-	      }
-
-	      if (car.changeChannel) {
-	        car.changeChannel(newLine, options);
-	        this.clearLine(oldLine);
-	        this.addLine(newLine, car);
-	        return car;
-	      } else {
-	        console.error(new ReferenceError('CableCar Dispatcher (change failed): car has no changeChannel function'), car);
-	        return false;
-	      }
-	    }
-	  }, {
-	    key: 'destroyCar',
-	    value: function destroyCar(line) {
-	      var activeLine = line || this.getSingleActiveLine();
-
-	      if (!activeLine) {
-	        console.error(new ReferenceError('CableCar Dispatcher (destroy failed): No car found on line/channel: ' + line));
-	        return false;
-	      }
-
-	      var car = this.getCar(activeLine);
-	      if (car && car.unsubscribe) {
-	        car.unsubscribe();
-	        this.clearLine(activeLine);
-	        return car;
-	      } else {
-	        console.error(new ReferenceError('CableCar Dispatcher (destroy failed): car has no unsubscribe function'), car);
-	        return false;
-	      }
-	    }
-	  }, {
-	    key: 'getCar',
-	    value: function getCar(line) {
-	      return this.getLines()[line];
-	    }
-	  }, {
-	    key: 'getDefaultCar',
-	    value: function getDefaultCar() {
-	      var activeLine = this.getSingleActiveLine();
-	      return activeLine ? this.getLines()[activeLine] : undefined;
-	    }
-	  }, {
-	    key: 'getSingleActiveLine',
-	    value: function getSingleActiveLine() {
-	      var allLines = this.getLines();
-	      var activeLines = [];
-	      for (var line in allLines) {
-	        if (allLines[line]) {
-	          activeLines.push(line);
-	        }
-	      }
-	      return activeLines.length === 1 ? activeLines[0] : undefined;
-	    }
-	  }, {
-	    key: 'reset',
-	    value: function reset() {
-	      this.clearAllLines();
-	    }
-	  }]);
-
-	  return CableCarDispatcher;
-	}();
-
-	exports.default = CableCarDispatcher;
-
-/***/ }),
-/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function() {

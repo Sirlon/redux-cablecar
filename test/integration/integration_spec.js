@@ -8,7 +8,7 @@ describe('Integrated functionality -->', () => {
   const mockSubscription = {
     perform: spy(),
     send: spy(msg => loggedServerActions.push(msg.type)),
-    unsubscribe: spy(),
+    unsubscribe: spy()
   };
   let ActionCableCalls;
   let ActionCableMockProvider;
@@ -63,8 +63,8 @@ describe('Integrated functionality -->', () => {
   it('sends and receives the proper messages', () => {
     const options = { params: { room: 5 }, prefix: '' };
     middleware.setProvider(ActionCableMockProvider);
-    car = middleware.connect(mystore, 'MyChannel', options);
-
+    car = middleware.connect(mystore, options);
+    car.subscribe('MyChannel', options.params)
     expect(mystore.getState().value).to.eq(0);
     mystore.dispatch({ type: 'dropped' });
     ActionCableCalls.initialized();
@@ -76,7 +76,7 @@ describe('Integrated functionality -->', () => {
     ActionCableCalls.connected();
     mystore.dispatch({ type: 'we are back' });
     ActionCableCalls.received({ type: 'HELLO_FROM_SERVER' });
-    ActionCableCalls.received({ type: 'CHANGE_VALUE', value: 100 });
+    ActionCableCalls.received({ type: 'CHANGE_VALUE', value: 100, channel: 'MyChannel' });
     expect(mystore.getState().value).to.eq(100);
     ActionCableCalls.received({
       type: 'CABLECAR_CHANGE_CHANNEL',
@@ -84,8 +84,7 @@ describe('Integrated functionality -->', () => {
       newChannel: 'NewChannel',
       options: { params: { room: 6 } },
     });
-    expect(car.getChannel()).to.eq('NewChannel');
-    expect(car.getParams().room).to.eq(6);
+    expect(car.getChannels()).to.deep.equals(['MyChannel']);
     ActionCableCalls.initialized();
     mystore.dispatch({ type: 'initialized but not connected' });
     ActionCableCalls.connected();
@@ -113,12 +112,12 @@ describe('Integrated functionality -->', () => {
   it('prefixes: sends and receives the proper messages', () => {
     const options = { prefix: 'CABLECAR', params: { room: 5 } };
     middleware.setProvider(ActionCableMockProvider);
-    car = middleware.connect(mystore, 'MyChannel', options);
-
+    car = middleware.connect(mystore, options);
+    car.subscribe('MyChannel', options.params)
     ActionCableCalls.initialized();
     ActionCableCalls.connected();
-    mystore.dispatch({ type: 'CABLECAR_SENDING_TO_RAILS', payload: 'YES' });
-    mystore.dispatch({ type: 'SKIP_SERVER', payload: 'NO' });
+    mystore.dispatch({ type: 'CABLECAR_SENDING_TO_RAILS', payload: 'YES', channel: 'MyChannel' });
+    mystore.dispatch({ type: 'SKIP_SERVER', payload: 'NO', channel: 'MyChannel' });
     ActionCableCalls.received({
       type: 'CABLECAR_CHANGE_CHANNEL',
       newChannel: 'NewChannel',
@@ -126,11 +125,11 @@ describe('Integrated functionality -->', () => {
       options: { prefix: 'NEW', params: { room: 6 } },
     });
     ActionCableCalls.connected();
-    mystore.dispatch({ type: 'NEW_SENDING_TO_RAILS_2', payload: 'YES' });
-    mystore.dispatch({ type: 'CABLECAR_NOW_REDUX_ONLY', payload: 'YES' });
+    mystore.dispatch({ type: 'NEW_SENDING_TO_RAILS_2', payload: 'YES', channel: 'MyChannel' });
+    mystore.dispatch({ type: 'CABLECAR_NOW_REDUX_ONLY', payload: 'YES', channel: 'MyChannel' });
 
     expect(loggedServerActions[0]).to.eq('CABLECAR_SENDING_TO_RAILS');
-    expect(loggedServerActions[1]).to.eq('NEW_SENDING_TO_RAILS_2');
+    expect(loggedServerActions[1]).to.eq('CABLECAR_SENDING_TO_RAILS_2');
 
     expect(loggedClientActions[0]).to.eq('CABLECAR_INITIALIZED');
     expect(loggedClientActions[1]).to.eq('CABLECAR_CONNECTED');

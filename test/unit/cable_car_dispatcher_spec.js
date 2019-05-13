@@ -43,21 +43,21 @@ describe('CableCarDispatcher', () => {
 
   describe('#destroyCar', () => {
     it('removes the car from the lines', () => {
-      let mockCar = { unsubscribe: () => {} };
-      spy(mockCar, 'unsubscribe');
+      let mockCar = { unsubscribe: () => {}, unsubscribeAll: () => {} };
+      spy(mockCar, 'unsubscribeAll');
       obj.addCar('line1', mockCar);
       expect(obj.getLines().line1).to.eq(mockCar);
       expect(obj.destroyCar('line1')).to.eq(mockCar);
-      expect(mockCar.unsubscribe).to.have.been.calledWith();
+      expect(mockCar.unsubscribeAll).to.have.been.calledWith();
       expect(obj.getLines().line1).to.eq(undefined);
     });
     it('removes the default car from the lines if there is only one', () => {
-      let mockCar = { unsubscribe: () => {} };
-      spy(mockCar, 'unsubscribe');
+      let mockCar = { unsubscribe: () => {}, unsubscribeAll: () => {} };
+      spy(mockCar, 'unsubscribeAll');
       obj.addCar('line1', mockCar);
       expect(obj.getLines().line1).to.eq(mockCar);
       expect(obj.destroyCar()).to.eq(mockCar);
-      expect(mockCar.unsubscribe).to.have.been.calledWith();
+      expect(mockCar.unsubscribeAll).to.have.been.calledWith();
       expect(obj.getLines().line1).to.eq(undefined);
     });
     it('returns false when no car is found on the line', () => {

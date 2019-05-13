@@ -55,7 +55,7 @@ export default class CableCarDispatcher {
 
     let car = this.getCar(activeLine);
     if (car && car.unsubscribe) {
-      car.unsubscribe();
+      car.unsubscribeAll();
       this.clearLine(activeLine);
       return car;
     } else {

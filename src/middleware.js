@@ -1,9 +1,11 @@
 import CableCar from './cableCar';
-import CableCarDispatcher from './cableCarDispatcher';
+//import CableCarDispatcher from './cableCarDispatcher';
 
 let cableProvider;
 
-const dispatcher = new CableCarDispatcher();
+let car
+
+//const dispatcher = new CableCarDispatcher();
 
 const middleware = store => next => (incomingAction) => {
   const action = incomingAction;
@@ -17,22 +19,30 @@ const middleware = store => next => (incomingAction) => {
       return next(action);
 
     case 'CABLECAR_DESTROY':
-      dispatcher.destroyCar(action.CableCarChannel);
+      if (car) {
+        car.unsubscribe(action.CableCarChannel);
+      }
+      
       return store.getState();
 
     case 'CABLECAR_DESTROY_ALL':
-      dispatcher.reset();
+      if (car) {
+        car.unsubscribeAll()
+      }
+      
       return store.getState();
 
     case 'CABLECAR_CHANGE_CHANNEL':
-      dispatcher.changeCar(action.previousChannel, action.newChannel, action.options);
+      if (car) {
+        car.changeChannel(action.newChannel, action.params)
+      }
+      
       return store.getState();
 
     default:
-      car = action.channel ? dispatcher.getCar(action.channel) : dispatcher.getDefaultCar();
       if (car && car.allows(action) && !action.CableCar__Action) {
         if (car.running) {
-          car.send(action);
+          car.send(action.channel, action);
         } else {
           console.error('CableCar: Dropped action!',
             'Attempting to dispatch an action but cable car is not running.',
@@ -48,7 +58,7 @@ const middleware = store => next => (incomingAction) => {
   }
 };
 
-middleware.connect = (store, channel, options) => {
+middleware.connect = (store, options) => {
   if (!cableProvider) {
     try {
       cableProvider = require('actioncable');
@@ -57,17 +67,16 @@ middleware.connect = (store, channel, options) => {
     }
   }
 
-  let car = new CableCar(cableProvider, store, channel, options);
-  dispatcher.addCar(channel, car);
+  car = new CableCar(cableProvider, store, options);
 
   // public car object returned
   return {
     changeChannel: car.changeChannel.bind(car),
-    getChannel: car.getChannel.bind(car),
-    getParams: car.getParams.bind(car),
+    getChannels: car.getChannels.bind(car),
     perform: car.perform.bind(car),
     send: car.send.bind(car),
-    unsubscribe: car.unsubscribe.bind(car)
+    unsubscribe: car.unsubscribe.bind(car),
+    subscribe: car.subscribe.bind(car)
   };
 }
 

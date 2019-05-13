@@ -13,7 +13,7 @@ describe('cablecar middleware', () => {
         subscriptions: {
           create: (params, callbacks) => {
             ActionCableCalls = callbacks;
-            return { send: () => {}, unsubscribe: () => {} };
+            return { send: () => {}, unsubscribe: () => {}, unsubscribeAll: () => {} };
           },
         },
       }),
@@ -45,7 +45,7 @@ describe('cablecar middleware', () => {
     });
 
     afterEach(() => {
-      store.dispatch({ type: "CABLECAR_DESTROY_ALL" });
+      store.dispatch({ type: 'CABLECAR_DESTROY_ALL' });
     })
 
     describe('when action is optimistic (and not flagged)', () => {
@@ -72,7 +72,8 @@ describe('cablecar middleware', () => {
     describe('when car is disconnected', () => {
       it('does not get passed on to redux', () => {
         let car = middleware.connect(store, 'channel1', { prefix: '' });
-        car.unsubscribe();
+        car.subscribe('channel1');
+        car.unsubscribe('channel1');
         expect(store.getState().value).to.eq(0);
         store.dispatch({ channel: 'channel1', type: 'CHANGE', value: 10 });
         expect(store.getState().value).to.eq(0);
@@ -80,8 +81,9 @@ describe('cablecar middleware', () => {
     });
     describe('when car is disconnected but optimisticOnFail is set', () => {
       it('does get passed on to redux', () => {
-        let car = middleware.connect(store, 'channel2', { prefix: '', optimisticOnFail: true });
-        car.unsubscribe();
+        let car = middleware.connect(store, { prefix: '', optimisticOnFail: true });
+        car.subscribe('channel2');
+        car.unsubscribe('channel2');
         expect(store.getState().value).to.eq(0);
         store.dispatch({ channel: 'channel2', type: 'CHANGE', value: 10 });
         expect(store.getState().value).to.eq(10);
@@ -91,9 +93,9 @@ describe('cablecar middleware', () => {
 
   describe('#connect', () => {
     it('creates a new CableCar object with proper arguments', () => {
-      let cc = middleware.connect({ dispatch: 'mockstoredispatch' }, 'channel', { prefix: '', params: { opt1: 6 }});
-      expect(cc.getChannel()).to.eq('channel');
-      expect(cc.getParams().opt1).to.eq(6);
+      let cc = middleware.connect({ dispatch: 'mockstoredispatch' }, { prefix: '', params: { opt1: 6 } });
+      cc.unsubscribe('channel');
+      expect(cc.getChannels()).to.eq(['channel']);
       cc = null;
     });
   });

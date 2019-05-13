@@ -1,7 +1,7 @@
 
 export default class CableCar {
 
-  constructor(cableProvider, store, channel, options = {}) {
+  constructor(cableProvider, store, options = {}) {
     if (typeof cableProvider === 'undefined') {
       throw new Error(`CableCar: unknown ActionCable provider: ${cableProvider}`);
     }
@@ -10,67 +10,62 @@ export default class CableCar {
       throw new Error(`CableCar: unknown store: ${store}`);
     }
 
-    if (typeof channel !== 'string') {
-      throw new Error(`CableCar: unknown channel: ${channel}`);
-    }
-
     this.actionCableProvider = cableProvider;
     this.store = store;
 
     const defaultOptions = { prefix: 'RAILS', optimisticOnFail: false };
-    this.initialize(channel, Object.assign(defaultOptions, options));
+    this.initialize(Object.assign(defaultOptions, options));
   }
 
-  initialize(channel, options) {
+  initialize(options) {
 
-    this.channel = channel;
+
     this.options = options;
     this.running = false;
+    this.subscriptions = {}
 
-    let cableParams = options.params || {};
-    cableParams = Object.assign({ channel }, cableParams);
-
-    this.subscription = this.actionCableProvider.createConsumer(options.wsURL).subscriptions.create(
-      cableParams, {
-        initialized: this.initialized,
-        connected: this.connected,
-        disconnected: this.disconnected,
-        received: this.received,
-        rejected: this.rejected,
-      },
-    );
+    this.consumer = this.actionCableProvider.createConsumer(options.wsURL);
   }
 
   // ActionCable callback functions
-  initialized = () => this.dispatch({ type: 'CABLECAR_INITIALIZED' });
+  initialized = (channel) => this.dispatch({ type: 'CABLECAR_INITIALIZED', channel });
 
-  connected = () => {
-    this.dispatch({ type: 'CABLECAR_CONNECTED' });
+  connected = (channel) => {
+    this.dispatch({ type: 'CABLECAR_CONNECTED', channel });
     this.running = true;
-    if (this.options.connected) { this.options.connected.call(); }
+    if (this.options.connected) { this.options.connected.call(channel); }
   }
 
-  disconnected = () => {
-    this.dispatch({ type: 'CABLECAR_DISCONNECTED' });
+  disconnected = (channel) => {
+    this.dispatch({ type: 'CABLECAR_DISCONNECTED', channel });
     this.running = false;
-    if (this.options.disconnected) { this.options.disconnected.call(); }
+    if (this.options.disconnected) { this.options.disconnected.call(channel); }
   }
 
-  received = (msg) => {
-    this.dispatch(msg);
+  received = (msg, channel) => {
+    this.dispatch({ ...msg, channel });
   }
 
-  rejected = () => {
+  rejected = (channel) => {
     throw new Error(
       `CableCar: Attempt to connect was rejected.
-      (Channel: ${this.channel})`,
+      (Channel: ${channel})`,
     );
+  }
+
+  subscribe (channel, params = {}) {
+    this.subscriptions[channel] = this.consumer.subscriptions.create(Object.assign({ channel }, params), {
+      initialized: () => this.initialized(channel),
+      connected: () => this.connected(channel),
+      disconnected: () => this.disconnected(channel),
+      received: (msg) => this.received(msg, channel),
+      rejected: () => this.rejected(channel),
+    })
   }
 
   // Redux dispatch function
   dispatch(action) {
     const newAction = Object.assign(action, {
-      channel: this.channel,
       CableCar__Action: true,
     });
     this.store.dispatch(newAction);
@@ -90,29 +85,45 @@ export default class CableCar {
   }
 
   // ActionCable subscription functions (exposed globally)
-  changeChannel(channel, options = {}) {
-    this.unsubscribe();
-    this.initialize(channel, Object.assign(this.options, options));
+  changeChannel(channel, params = {}) {
+    if (this.subscriptions[channel]) {
+      this.unsubscribe(channel);
+      this.subscribe(channel, params)
+    }  else {
+      throw new Error(`CableCar: Unknown Channel ${channel} to change Channel`)
+    }
   }
 
-  getChannel() {
-    return this.channel;
+  getChannels() {
+    return Object.keys(this.subscriptions);
   }
 
-  getParams() {
-    return this.options.params;
+  perform(channel, method, payload) {
+    if (this.subscriptions[channel]) {
+      this.subscriptions[channel].perform(method, payload);
+    } else {
+      throw new Error(`CableCar: Unknown Channel ${channel} to call perform ${method}`)
+    }
   }
 
-  perform(method, payload) {
-    this.subscription.perform(method, payload);
+  send(channel, action) {
+    if (this.subscriptions[channel]) {
+      this.subscriptions[channel].send(action);
+    } else {
+      throw new Error(`CableCar: Unknown Channel ${channel} to send ${action.type}`)
+    }
   }
 
-  send(action) {
-    this.subscription.send(action);
+  unsubscribe(channel) {
+    if (this.subscriptions[channel]) {
+      this.subscriptions[channel].unsubscribe();
+      this.disconnected(channel);
+    }
   }
 
-  unsubscribe() {
-    this.subscription.unsubscribe();
-    this.disconnected();
+  unsubscribeAll () {
+    Object.keys(this.subscriptions).forEach(channel => {
+      this.unsubscribe(channel)
+    })
   }
 }
