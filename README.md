@@ -16,8 +16,8 @@ Uses a websocket connection to flow redux actions between the client and the ser
 ## #setProvider(actionCableProvider) *optional*
 By default the Rails 'actionprovider' package is used, but it can be passed into the middleware as well. It must be set before calling #connect.
 
-## #connect(store, channel, options)
-Connects the store to the ActionCable channel   
+## #connect(store, options)
+Connects the store to ActionCable
 Returns a `CableCar` object
 
 ## Example:
@@ -30,11 +30,11 @@ import cablecar from 'redux-cablecar';
 const store = createStore(reducer, applyMiddleware(cablecar...));
 
 const options = {
-  params: { room: 'game' },
   prefix: 'SERVER_ACTION'
 };
 
-cablecar.connect(store, 'ChatChannel', options);
+const car = cablecar.connect(store, options);
+
 ```
 This connects the store to the ActionCable subscription `ChatChannel` with `params[:room] = "game"`.  
 
@@ -72,23 +72,24 @@ For example, if the `prefix` is set to `'SYSTEM'`:
 ## CableCar object
 The middleware's `#connect` function returns a CableCar object with the following functions:
 
-### #changeChannel(channel, options)
+### #subscribe(channel, params)
+Subscribe to a channel
+
+### #changeChannel(channel, params)
 Manually change the car's channel.  
 (See below on how to do it with a *Redux action*)
 
-### #getChannel
-Returns the current CableCar's channel.
+### #getChannels
+Returns the list of connected Channels.
 
-### #getParams
-Returns the current CableCar's params.
-
-### #perform(method, payload)
+### #perform(channel, method, payload)
 Calls a Rails method directly.
 
 **Example:**
 ```js6
 const car = cablecar.connect(store, ... )
-car.perform('activate', { data: ... })
+car.subscribe('ChatChannel', { room: 'green' })
+car.perform('ChatChannel', 'activate', { data: ... })
 ```
 ```rubyonrails
 class ChatChannel < ApplicationCable::Channel
@@ -103,7 +104,7 @@ end
 ```
 ([See ActionCable documentation for more](http://edgeguides.rubyonrails.org/action_cable_overview.html))
 
-### #send(action)
+### #send(channel, action)
 Sends a direct communication to Rails (outside of the Redux middleware chain)
 
 ## Reserved Action Types
