@@ -9,7 +9,6 @@ let car
 
 const middleware = store => next => (incomingAction) => {
   const action = incomingAction;
-  let car;
 
   switch (action.type) {
 

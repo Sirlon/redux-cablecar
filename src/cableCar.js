@@ -54,6 +54,7 @@ export default class CableCar {
   }
 
   subscribe (channel, params = {}) {
+    console.log('SUBSCRIBE', channel, params)
     this.subscriptions[channel] = this.consumer.subscriptions.create(Object.assign({ channel }, params), {
       initialized: () => this.initialized(channel),
       connected: () => this.connected(channel),
@@ -86,9 +87,10 @@ export default class CableCar {
 
   // ActionCable subscription functions (exposed globally)
   changeChannel(channel, params = {}) {
+    console.log('CHANGE CHANNEL')
     if (this.subscriptions[channel]) {
       this.unsubscribe(channel);
-      this.subscribe(channel, params)
+      this.subscribe(channel, params);
     }  else {
       throw new Error(`CableCar: Unknown Channel ${channel} to change Channel`)
     }
@@ -107,6 +109,7 @@ export default class CableCar {
   }
 
   send(channel, action) {
+    console.log('SEND', action, channel)
     if (this.subscriptions[channel]) {
       this.subscriptions[channel].send(action);
     } else {
@@ -115,6 +118,7 @@ export default class CableCar {
   }
 
   unsubscribe(channel) {
+    console.log('unsubscribe', channel)
     if (this.subscriptions[channel]) {
       this.subscriptions[channel].unsubscribe();
       this.disconnected(channel);
