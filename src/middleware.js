@@ -19,49 +19,46 @@ const middleware = store => next => (incomingAction) => {
 
     case 'CABLECAR_DESTROY':
       if (car) {
-        car.unsubscribe(action.CableCarChannel);
+        car.unsubscribe(action.channel);
       }
-      
       return store.getState();
 
     case 'CABLECAR_DESTROY_ALL':
       if (car) {
-        car.unsubscribeAll()
+        car.unsubscribeAll();
       }
-      
       return store.getState();
 
     case 'CABLECAR_CHANGE_CHANNEL':
       if (car) {
-        car.changeChannel(action.newChannel, action.params)
+        car.changeChannel(action.newChannel, action.params);
       }
-      
       return store.getState();
 
     default:
-      if (car && car.allows(action) && !action.CableCar__Action) {
-        if (car.running) {
+      if (car && car.allows(action) && action.channel && !action.CableCar__Action) {
+        if (car.running.indexOf(action.channel) > -1) {
           car.send(action.channel, action);
         } else {
+          // eslint-disable-next-line no-console
           console.error('CableCar: Dropped action!',
             'Attempting to dispatch an action but cable car is not running.',
             action,
-            'optimisticOnFail: ' + car.options.optimisticOnFail
-          );
+            `optimisticOnFail: ${car.options.optimisticOnFail}`);
           return car.options.optimisticOnFail ? next(action) : store.getState();
         }
         return action.optimistic ? next(action) : store.getState();
-      } else {
-        return next(action);
       }
+      return next(action);
   }
 };
 
 middleware.connect = (store, options) => {
   if (!cableProvider) {
     try {
+      // eslint-disable-next-line global-require
       cableProvider = require('actioncable');
-    } catch(e) {
+    } catch (e) {
       throw new Error(`CableCar: No actionCableProvider set and 'actioncable' Node package failed to load: ${e}`);
     }
   }
@@ -77,7 +74,7 @@ middleware.connect = (store, options) => {
     unsubscribe: car.unsubscribe.bind(car),
     subscribe: car.subscribe.bind(car)
   };
-}
+};
 
 middleware.setProvider = (newProvider) => {
   cableProvider = newProvider;

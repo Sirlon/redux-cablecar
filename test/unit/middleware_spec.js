@@ -33,7 +33,8 @@ describe('cablecar middleware', () => {
   };
 
   // functioning store
-  let car, store;
+  let car;
+  let store;
 
   describe('#middleware', () => {
     // recreate store before each test
@@ -41,12 +42,13 @@ describe('cablecar middleware', () => {
       store = createStore(mockReducer, { value: 0 }, applyMiddleware(middleware));
       middleware.setProvider(ActionCableMockProvider);
       car = middleware.connect(store, 'channel', { opt1: 6 });
+      car.subscribe('channel', { opt1: 6 });
       ActionCableCalls.connected();
     });
 
     afterEach(() => {
       store.dispatch({ type: 'CABLECAR_DESTROY_ALL' });
-    })
+    });
 
     describe('when action is optimistic (and not flagged)', () => {
       it('gets passed on to redux', () => {
@@ -71,9 +73,9 @@ describe('cablecar middleware', () => {
     });
     describe('when car is disconnected', () => {
       it('does not get passed on to redux', () => {
-        let car = middleware.connect(store, 'channel1', { prefix: '' });
-        car.subscribe('channel1');
-        car.unsubscribe('channel1');
+        const car2 = middleware.connect(store, { prefix: '' });
+        car2.subscribe('channel1');
+        car2.unsubscribe('channel1');
         expect(store.getState().value).to.eq(0);
         store.dispatch({ channel: 'channel1', type: 'CHANGE', value: 10 });
         expect(store.getState().value).to.eq(0);
@@ -81,9 +83,9 @@ describe('cablecar middleware', () => {
     });
     describe('when car is disconnected but optimisticOnFail is set', () => {
       it('does get passed on to redux', () => {
-        let car = middleware.connect(store, { prefix: '', optimisticOnFail: true });
-        car.subscribe('channel2');
-        car.unsubscribe('channel2');
+        const car3 = middleware.connect(store, { prefix: '', optimisticOnFail: true });
+        car3.subscribe('channel2');
+        car3.unsubscribe('channel2');
         expect(store.getState().value).to.eq(0);
         store.dispatch({ channel: 'channel2', type: 'CHANGE', value: 10 });
         expect(store.getState().value).to.eq(10);
@@ -94,8 +96,8 @@ describe('cablecar middleware', () => {
   describe('#connect', () => {
     it('creates a new CableCar object with proper arguments', () => {
       let cc = middleware.connect({ dispatch: 'mockstoredispatch' }, { prefix: '', params: { opt1: 6 } });
-      cc.unsubscribe('channel');
-      expect(cc.getChannels()).to.eq(['channel']);
+      cc.subscribe('channel');
+      expect(cc.getChannels()).to.deep.equals(['channel']);
       cc = null;
     });
   });

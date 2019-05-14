@@ -250,7 +250,6 @@ module.exports =
 
 	      var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
-	      console.log('SUBSCRIBE', channel, params);
 	      this.subscriptions[channel] = this.consumer.subscriptions.create(Object.assign({ channel: channel }, params), {
 	        initialized: function initialized() {
 	          return _this2.initialized(channel);
@@ -303,7 +302,6 @@ module.exports =
 	    value: function changeChannel(channel) {
 	      var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
-	      console.log('CHANGE CHANNEL');
 	      if (this.subscriptions[channel]) {
 	        this.unsubscribe(channel);
 	        this.subscribe(channel, params);
@@ -328,7 +326,6 @@ module.exports =
 	  }, {
 	    key: 'send',
 	    value: function send(channel, action) {
-	      console.log('SEND', action, channel);
 	      if (this.subscriptions[channel]) {
 	        this.subscriptions[channel].send(action);
 	      } else {
@@ -338,7 +335,6 @@ module.exports =
 	  }, {
 	    key: 'unsubscribe',
 	    value: function unsubscribe(channel) {
-	      console.log('unsubscribe', channel);
 	      if (this.subscriptions[channel]) {
 	        this.subscriptions[channel].unsubscribe();
 	        this.disconnected(channel);

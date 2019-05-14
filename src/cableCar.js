@@ -1,6 +1,5 @@
 
 export default class CableCar {
-
   constructor(cableProvider, store, options = {}) {
     if (typeof cableProvider === 'undefined') {
       throw new Error(`CableCar: unknown ActionCable provider: ${cableProvider}`);
@@ -18,27 +17,32 @@ export default class CableCar {
   }
 
   initialize(options) {
-
-
     this.options = options;
-    this.running = false;
-    this.subscriptions = {}
+    this.running = [];
+    this.subscriptions = {};
 
     this.consumer = this.actionCableProvider.createConsumer(options.wsURL);
   }
 
   // ActionCable callback functions
-  initialized = (channel) => this.dispatch({ type: 'CABLECAR_INITIALIZED', channel });
+  initialized = channel => this.dispatch({ type: 'CABLECAR_INITIALIZED', channel });
 
   connected = (channel) => {
     this.dispatch({ type: 'CABLECAR_CONNECTED', channel });
-    this.running = true;
+    const index = this.running.indexOf(channel);
+    if (index === -1) {
+      this.running.push(channel);
+    }
     if (this.options.connected) { this.options.connected.call(channel); }
   }
 
   disconnected = (channel) => {
     this.dispatch({ type: 'CABLECAR_DISCONNECTED', channel });
-    this.running = false;
+    const index = this.running.indexOf(channel);
+    if (index > -1) {
+      this.running[index] = this.running[this.running.length - 1];
+      this.running.pop();
+    }
     if (this.options.disconnected) { this.options.disconnected.call(channel); }
   }
 
@@ -53,15 +57,16 @@ export default class CableCar {
     );
   }
 
-  subscribe (channel, params = {}) {
-    console.log('SUBSCRIBE', channel, params)
-    this.subscriptions[channel] = this.consumer.subscriptions.create(Object.assign({ channel }, params), {
-      initialized: () => this.initialized(channel),
-      connected: () => this.connected(channel),
-      disconnected: () => this.disconnected(channel),
-      received: (msg) => this.received(msg, channel),
-      rejected: () => this.rejected(channel),
-    })
+  subscribe(channel, params = {}) {
+    this.subscriptions[channel] = this.consumer.subscriptions.create(
+      Object.assign({ channel }, params), {
+        initialized: () => this.initialized(channel),
+        connected: () => this.connected(channel),
+        disconnected: () => this.disconnected(channel),
+        received: msg => this.received(msg, channel),
+        rejected: () => this.rejected(channel),
+      },
+    );
   }
 
   // Redux dispatch function
@@ -87,11 +92,10 @@ export default class CableCar {
 
   // ActionCable subscription functions (exposed globally)
   changeChannel(channel, params = {}) {
-    console.log('CHANGE CHANNEL')
     if (this.subscriptions[channel]) {
       this.unsubscribe(channel);
       this.subscribe(channel, params);
-    }  else {
+    } else {
       throw new Error(`CableCar: Unknown Channel ${channel} to change Channel`)
     }
   }
@@ -109,7 +113,6 @@ export default class CableCar {
   }
 
   send(channel, action) {
-    console.log('SEND', action, channel)
     if (this.subscriptions[channel]) {
       this.subscriptions[channel].send(action);
     } else {
@@ -118,16 +121,16 @@ export default class CableCar {
   }
 
   unsubscribe(channel) {
-    console.log('unsubscribe', channel)
     if (this.subscriptions[channel]) {
       this.subscriptions[channel].unsubscribe();
+      delete this.subscriptions[channel];
       this.disconnected(channel);
     }
   }
 
-  unsubscribeAll () {
-    Object.keys(this.subscriptions).forEach(channel => {
-      this.unsubscribe(channel)
-    })
+  unsubscribeAll() {
+    Object.keys(this.subscriptions).forEach((channel) => {
+      this.unsubscribe(channel);
+    });
   }
 }
