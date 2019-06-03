@@ -62,7 +62,7 @@ describe('CableCar', () => {
       // eslint-disable-next-line no-unused-expressions
       expect(mockCreateFunc).to.have.been.called;
     });
-  })
+  });
 
   describe('#changeChannel', () => {
     it('unsubscribes from the old subscription', () => {

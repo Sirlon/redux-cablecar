@@ -97,37 +97,34 @@ module.exports =
 
 	        case 'CABLECAR_DESTROY':
 	          if (car) {
-	            car.unsubscribe(action.CableCarChannel);
+	            car.unsubscribe(action.channel);
 	          }
-
 	          return store.getState();
 
 	        case 'CABLECAR_DESTROY_ALL':
 	          if (car) {
 	            car.unsubscribeAll();
 	          }
-
 	          return store.getState();
 
 	        case 'CABLECAR_CHANGE_CHANNEL':
 	          if (car) {
 	            car.changeChannel(action.newChannel, action.params);
 	          }
-
 	          return store.getState();
 
 	        default:
-	          if (car && car.allows(action) && !action.CableCar__Action) {
-	            if (car.running) {
+	          if (car && car.allows(action) && action.channel && !action.CableCar__Action) {
+	            if (car.running.indexOf(action.channel) > -1) {
 	              car.send(action.channel, action);
 	            } else {
+	              // eslint-disable-next-line no-console
 	              console.error('CableCar: Dropped action!', 'Attempting to dispatch an action but cable car is not running.', action, 'optimisticOnFail: ' + car.options.optimisticOnFail);
 	              return car.options.optimisticOnFail ? next(action) : store.getState();
 	            }
 	            return action.optimistic ? next(action) : store.getState();
-	          } else {
-	            return next(action);
 	          }
+	          return next(action);
 	      }
 	    };
 	  };
@@ -136,6 +133,7 @@ module.exports =
 	middleware.connect = function (store, options) {
 	  if (!cableProvider) {
 	    try {
+	      // eslint-disable-next-line global-require
 	      cableProvider = __webpack_require__(3);
 	    } catch (e) {
 	      throw new Error('CableCar: No actionCableProvider set and \'actioncable\' Node package failed to load: ' + e);
@@ -193,7 +191,10 @@ module.exports =
 
 	    this.connected = function (channel) {
 	      _this.dispatch({ type: 'CABLECAR_CONNECTED', channel: channel });
-	      _this.running = true;
+	      var index = _this.running.indexOf(channel);
+	      if (index === -1) {
+	        _this.running.push(channel);
+	      }
 	      if (_this.options.connected) {
 	        _this.options.connected.call(channel);
 	      }
@@ -201,7 +202,11 @@ module.exports =
 
 	    this.disconnected = function (channel) {
 	      _this.dispatch({ type: 'CABLECAR_DISCONNECTED', channel: channel });
-	      _this.running = false;
+	      var index = _this.running.indexOf(channel);
+	      if (index > -1) {
+	        _this.running[index] = _this.running[_this.running.length - 1];
+	        _this.running.pop();
+	      }
 	      if (_this.options.disconnected) {
 	        _this.options.disconnected.call(channel);
 	      }
@@ -233,9 +238,8 @@ module.exports =
 	  _createClass(CableCar, [{
 	    key: 'initialize',
 	    value: function initialize(options) {
-
 	      this.options = options;
-	      this.running = false;
+	      this.running = [];
 	      this.subscriptions = {};
 
 	      this.consumer = this.actionCableProvider.createConsumer(options.wsURL);
@@ -337,6 +341,7 @@ module.exports =
 	    value: function unsubscribe(channel) {
 	      if (this.subscriptions[channel]) {
 	        this.subscriptions[channel].unsubscribe();
+	        delete this.subscriptions[channel];
 	        this.disconnected(channel);
 	      }
 	    }
