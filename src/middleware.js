@@ -33,7 +33,7 @@ const middleware = store => next => (incomingAction) => {
       if (car) {
         car.changeChannel(action.newChannel, action.params);
       }
-      return store.getState();
+      return next(action);
 
     default:
       if (car && car.allows(action) && action.channel && !action.CableCar__Action) {

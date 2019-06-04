@@ -96,7 +96,7 @@ export default class CableCar {
       this.unsubscribe(channel);
       this.subscribe(channel, params);
     } else {
-      throw new Error(`CableCar: Unknown Channel ${channel} to change Channel`)
+      throw new Error(`CableCar: Unknown Channel ${channel} to change Channel`);
     }
   }
 
